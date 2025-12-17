@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uppgift 03: Responsiv Web Component (Detaljerade Kommentarer)</title>
+
+    <style>
+        
+        /* ALLMÄNNA STILAR FÖR SIDAN (YTTRE SKALET) */
+        /* Dessa stilar påverkar allt UTOM det som finns inuti Shadow DOM. */
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9; /* Lätt grå bakgrund */
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        /* Stilar för kontrollpanelen högst upp på sidan */
+        .controls {
+            padding: 15px;
+            margin-bottom: 30px;
+            border: 2px solid #00bcd4; /* En tydlig blå ram */
+            border-radius: 8px;
+            background-color: #e0f7fa;
+            text-align: center;
+        }
+
+        /* Stilar för texten som visar status */
+        .page-status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        /* Stilar för den spak (slider) vi använder för att ändra bredden */
+        #width-slider {
+            width: 80%; /* Gör slidern bred och enkel att använda */
+            margin-top: 10px;
+        }
+        
+        
+        /* STILAR FÖR INNEHÅLLET (Kolumn A och B) */
+        /* Dessa är de två <div>-element som ligger direkt inuti <responsive-columns> taggen */
+        
+        responsive-columns > div {
+            padding: 15px;
+            margin-top: 10px; /* Lägger till lite mellanrum när kolumnerna staplas */
+            border: 1px solid #ccc;
+            background-color: #ffffff;
+            min-height: 150px; /* Gör kolumnerna höga, bra för demonstration */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Responsiv Två-Kolumns Web Component Demo (Manuell Kontroll)</h1>
+
+    <div class="controls">
+        <h3>Simulera Fönsterbredd</h3>
+        <p id="current-width-display">Aktuell Simulerad Bredd: 800px</p>
+        <input type="range" id="width-slider" min="300" max="1200" value="800">
+        <div class="page-status" id="status-text"></div>
+    </div>
+
+    <responsive-columns threshold="600">
+        <div>
+            <h2>Kolumn A: Huvudinnehåll (Bredaste)</h2>
+            <p>Denna kolumn får 2/3 av utrymmet när layouten är i två kolumner (2fr).</p>
+        </div>
+        <div>
+            <h2>Kolumn B: Sidopanel (Smalaste)</h2>
+            <p>Denna kolumn får 1/3 av utrymmet (1fr). I smalt läge visas den under Kolumn A.</p>
+        </div>
+    </responsive-columns>
+
+    <script>
+        
+        // 1. DEFINITION AV WEBBKOMPONENTEN (JavScript-klass)
+        
+
+        // Vi skapar en ny klass som heter ResponsiveColumns. Den ärver från HTMLElement.
+        class ResponsiveColumns extends HTMLElement {
+            
+            // Vi sparar referenser till elementen utanför komponenten för att kunna uppdatera dem snabbt
+            static statusElement = document.getElementById('status-text');
+            static widthDisplay = document.getElementById('current-width-display');
+            
+            constructor() {
+                super(); // Måste alltid anropas först i en klass
+                
+                // Shadow DOM: En avancerad funktion som kapslar in (gömmer) komponentens inre CSS och HTML.
+                // 'open' betyder att vi kan komma åt det med JavaScript.
+                this.attachShadow({ mode: 'open' }); 
+
+                // Ritar upp komponentens inre struktur och stil
+                this.render();
+            }
+
+            // connectedCallback körs automatiskt när elementet är laddat och redo i HTML-sidan.
+            connectedCallback() {
+                // Inget att göra här, eftersom vi använder slidern för att trigga layoutändringar.
+            }
+            
+            // updateLayout(simulatedWidth)
+            // HUVUDALGORITMEN: Denna metod körs varje gång vi drar i slidern.
+            updateLayout(simulatedWidth) {
+                // Hämta tröskelvärdet ("600") från HTML-attributet
+                const threshold = parseInt(this.getAttribute('threshold') || 768, 10);
+                
+                // Hitta behållaren (.container) inuti Shadow DOM där layouten ska ändras
+                const container = this.shadowRoot.querySelector('.container');
+
+                
+                // LOGIKEN FÖR LAYOUTBYTE (KONTROLL)//
+
+                if (simulatedWidth >= threshold) {
+                    // OM bredden är tillräcklig: Lägg till CSS-klassen 'two-column'
+                    container.classList.add('two-column');
+                } else {
+                    // OM bredden är för liten: Ta bort CSS-klassen 'two-column'
+                    container.classList.remove('two-column');
+                }
+
+                // Uppdaterar Statusrutan på sidan för att visa användaren vad som händer
+                if (ResponsiveColumns.statusElement) {
+                    const statusText = (simulatedWidth >= threshold)
+                        ? `✅ **Två-kolumns layout:** Simulerad bredd (${simulatedWidth}px) är över gränsvärdet (${threshold}px).`
+                        : `❌ **En-kolumns layout:** Simulerad bredd (${simulatedWidth}px) är under gränsvärdet (${threshold}px).`;
+                    
+                    ResponsiveColumns.statusElement.innerHTML = statusText;
+                }
+            }
+            
+            // render()
+            // Skapar den interna strukturen och stilen för komponenten
+            render() {
+                this.shadowRoot.innerHTML = `
+                    <style>
+                        /* Standardstil (ALLTID AKTIV): En kolumn */
+                        .container {
+                            display: block; /* Får elementen att staplas vertikalt */
+                            padding: 0;
+                            transition: all 0.3s ease; /* Gör layoutbytet mjukt */
+                        }
+
+                        /* ---------------------------------------------------- */
+                        /* STILAR SOM AKTIVERAS NÄR 'two-column' KLASSEN LÄGGS TILL (i updateLayout) */
+                        /* ---------------------------------------------------- */
+                        .two-column {
+                            display: grid; /* Ändra till Grid-layout */
+                            
+                            /* FR-ENHETER: Här definieras kolumnbredden flexibelt! */
+                            /* 2fr 1fr betyder att den totala bredden delas i 3 delar. 
+                                Kolumn 1 får 2 delar, Kolumn 2 får 1 del. De justeras automatiskt. */
+                            grid-template-columns: 2fr 1fr; 
+                            gap: 20px;
+                        }
+
+                        /* ::slotted(div) tillåter oss att styla elementen som är inkapslade (Kolumn A/B) */
+                        ::slotted(div) {
+                            margin-top: 0 !important; /* Tar bort den externa marginalen när de är i grid */
+                        }
+                    </style>
+                    <div class="container">
+                        <slot></slot> 
+                    </div>
+                `;
+            }
+        }
+        
+    
+        // 2. KONTROLL LOGIK UTANFÖR KOMPONENTEN
+        
+
+        // Registrera vår nya tagg: Nu vet webbläsaren hur <responsive-columns> ska fungera
+        customElements.define('responsive-columns', ResponsiveColumns);
+
+
+        // Hitta slidern och vår webbkomponent på sidan
+        const slider = document.getElementById('width-slider');
+        const component = document.querySelector('responsive-columns');
+
+        // Funktion som körs varje gång användaren drar i slidern
+        function handleSliderInput(event) {
+            // Hämta sliderns nuvarande värde och gör det till ett heltal
+            const simulatedWidth = parseInt(event.target.value, 10);
+            
+            // Uppdaterar texten över slidern
+            ResponsiveColumns.widthDisplay.textContent = `Aktuell Simulerad Bredd: ${simulatedWidth}px`;
+
+            // Kallar på HUVUDALGORITMEN (updateLayout) inuti webbkomponenten med det nya värdet
+            if (component && component.updateLayout) {
+                component.updateLayout(simulatedWidth);
+            }
+        }
+
+        // Lyssna på slider-rörelser (input)
+        slider.addEventListener('input', handleSliderInput);
+
+        // STARTUP: Kör layout-algoritmen en gång när sidan laddas, baserat på sliderns startvärde (800)
+        if (component && component.updateLayout) {
+             component.updateLayout(parseInt(slider.value, 10));
+        }
+
+    </script>
+
+</body>
+</html>
